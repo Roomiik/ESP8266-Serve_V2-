@@ -1,0 +1,123 @@
+const express = require('express');
+const sqlite3 = require('sqlite3').verbose();
+const cors = require('cors');
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+// Підключення до бази даних
+const db = new sqlite3.Database('./sensors.db');
+
+// Додавання нового пристрою (з фронтенду)
+app.post('/api/devices', (req, res) => {
+  const { code, name, type, subtype, unit } = req.body;
+  
+  if (type === 'sensor') {
+    db.run('INSERT INTO sensors (code, name, type, subtype, unit) VALUES (?, ?, ?, ?, ?)',
+      [code, name, type, subtype, unit],
+      function(err) {
+        if (err) return res.status(400).json({ error: err.message });
+        res.json({ id: this.lastID });
+      }
+    );
+  } else if (type === 'pump') {
+    db.run('INSERT INTO pumps (code, name, status) VALUES (?, ?, ?)',
+      [code, name, 'off'],
+      function(err) {
+        if (err) return res.status(400).json({ error: err.message });
+        res.json({ id: this.lastID });
+      }
+    );
+  }
+});
+
+// Отримання всіх пристроїв
+app.get('/api/devices', (req, res) => {  
+  db.all('SELECT * FROM sensors', (err, sensors) => {
+    if (err) {
+      console.error('Помилка sensors:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    
+    db.all('SELECT * FROM pumps', (err, pumps) => {
+      if (err) {
+        console.error('Помилка pumps:', err);
+        return res.status(500).json({ error: err.message });
+      }
+      
+      const pumpsWithType = pumps.map(p => ({ ...p, type: 'pump' }));
+      res.json([...sensors, ...pumpsWithType]);
+    });
+  });
+});
+
+// Отримання останніх даних для всіх датчиків
+app.get('/api/sensors/latest', (req, res) => {
+  const query = `
+   SELECT *
+FROM sensor_data s1
+WHERE timestamp = (
+    SELECT MAX(timestamp)
+    FROM sensor_data s2
+    WHERE s2.sensor_code = s1.sensor_code
+)
+AND sensor_code IN ('00T01', '00T02');
+  `;
+  db.all(query, (err, rows) => {
+    
+    if (err) {
+      console.error('Database error:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+    // Якщо rows = undefined або null, повертаємо []
+    res.json(rows || []);
+  });
+});
+
+// Прийом даних від ESP8266
+app.post('/api/sensors/data', (req, res) => {
+    const data = req.body;
+  Object.keys(data).forEach((d) => {
+      db.run('INSERT INTO sensor_data (sensor_code, value) VALUES (?, ?)',
+      [data[d]?.code, data[d]?.value],
+      function(err) {
+        if(err) return console.log(err);
+        console.log(data[d]?.code, data[d]?.value);
+        
+      }
+    );
+  });
+  res.json({ received: true });
+});
+
+// Керування насосом (зміна статусу)
+app.post('/api/pumps/:code/toggle', (req, res) => {
+  const { code } = req.params;
+  console.log(code);
+  
+  
+  db.get('SELECT status FROM pumps WHERE code = ?', [code], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ error: 'Pump not found' });
+    
+    const newStatus = row.status === 'on' ? 'off' : 'on';
+    db.run('UPDATE pumps SET status = ? WHERE code = ?', [newStatus, code], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ code, status: newStatus });
+    });
+  });
+});
+
+app.post('/api/devices/del/', (req, res) => {
+  const { code } = req.body;
+  console.log(code);
+  
+  db.get('DELETE FROM sensors WHERE code = ?', [code], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ error: 'Pump not found' });
+    res.status({"status": "ok"})
+  });
+});
+
+app.listen(3000, () => console.log('Server running on port 3000'));
