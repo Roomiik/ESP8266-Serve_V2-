@@ -56,15 +56,24 @@ app.get('/api/devices', (req, res) => {
 
 // Отримання останніх даних для всіх датчиків
 app.get('/api/sensors/latest', (req, res) => {
+//    SELECT *
+// FROM sensor_data s1
+// WHERE timestamp = (
+//     SELECT MAX(timestamp)
+//     FROM sensor_data s2
+//     WHERE s2.sensor_code = s1.sensor_code
+// )
+// AND sensor_code IN ('00T01', '00T02');
+
   const query = `
-   SELECT *
-FROM sensor_data s1
-WHERE timestamp = (
-    SELECT MAX(timestamp)
-    FROM sensor_data s2
-    WHERE s2.sensor_code = s1.sensor_code
-)
-AND sensor_code IN ('00T01', '00T02');
+SELECT s.*
+FROM sensor_data s
+JOIN (
+    SELECT sensor_code, MAX(id) AS last_id
+    FROM sensor_data
+    GROUP BY sensor_code
+) AS last_records
+ON s.id = last_records.last_id;
   `;
   db.all(query, (err, rows) => {
     
@@ -73,6 +82,7 @@ AND sensor_code IN ('00T01', '00T02');
       return res.status(500).json({ error: err.message });
     }
     // Якщо rows = undefined або null, повертаємо []
+    
     res.json(rows || []);
   });
 });
