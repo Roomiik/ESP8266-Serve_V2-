@@ -8,6 +8,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // Підключення до бази даних
 const db = new sqlite3.Database('./sensors.db');
+let API_RS = 0;
+let API_R0 = 0;
 
 // Додавання нового пристрою (з фронтенду)
 app.post('/api/devices', (req, res) => {
@@ -91,6 +93,21 @@ app.post('/api/sensors/data', (req, res) => {
   res.json({ received: true });
 });
 
+app.post('/api/sensors/mq', (req, res) => {
+  const { rs, r0 } = req.body;
+
+  console.log("Rs:", rs);
+  console.log("R0:", r0);
+  API_R0 = r0;
+  API_RS = rs;
+
+  res.json({ "RS": rs, "R0": r0 });
+});
+app.get('/api/sensors/mq/api', (req, res) => {
+  console.log({ "RS": API_RS, "R0": API_R0 });
+  
+  res.json({ "RS": API_RS, "R0": API_R0 });
+});
 // Керування насосом (зміна статусу)
 app.post('/api/pumps/:code/toggle', (req, res) => {
   const { code } = req.params;
