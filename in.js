@@ -147,4 +147,13 @@ app.post('/api/devices/del/', (req, res) => {
   });
 });
 
+app.get('/api/sensors/:code/history', (req, res) => {
+  const { code } = req.params;
+  const query = `SELECT value, timestamp FROM sensor_data WHERE sensor_code = ? ORDER BY timestamp ASC`;
+  db.all(query, [code], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
 app.listen(3000, () => console.log('Server running on port 3000'));
