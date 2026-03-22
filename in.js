@@ -167,7 +167,7 @@ app.post('/api/admin/sql', (req, res) => {
   }
 
   // Забороняємо небезпечні операції
-  const forbidden = ['DROP', 'DELETE FROM', 'UPDATE', 'INSERT', 'ALTER', 'CREATE', 'PRAGMA'];
+  const forbidden = ['DROP', 'DELETE FROM', 'UPDATE', 'INSERT', 'ALTER', 'CREATE', 'PRAGMA', 'TRUNCATE '];
   const upperQuery = query.toUpperCase();
   /*if (forbidden.some(cmd => upperQuery.includes(cmd))) {
     return res.status(400).json({ error: 'Операція заборонена в цьому інтерфейсі' });
