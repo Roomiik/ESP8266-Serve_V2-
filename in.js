@@ -157,4 +157,34 @@ app.get('/api/sensors/:code/history', (req, res) => {
   });
 });
 
+// Для безпеки – додамо простий ключ (змініть на свій)
+const ADMIN_SECRET = 'my_secret_key_123'; // змініть на випадковий рядок
+
+app.post('/api/admin/sql', (req, res) => {
+  const { query, secret } = req.body;
+  if (secret !== ADMIN_SECRET) {
+    return res.status(403).json({ error: 'Невірний ключ доступу' });
+  }
+
+  // Забороняємо небезпечні операції
+  const forbidden = ['DROP', 'DELETE FROM', 'UPDATE', 'INSERT', 'ALTER', 'CREATE', 'PRAGMA'];
+  const upperQuery = query.toUpperCase();
+  if (forbidden.some(cmd => upperQuery.includes(cmd))) {
+    return res.status(400).json({ error: 'Операція заборонена в цьому інтерфейсі' });
+  }
+
+  // Дозволяємо тільки SELECT
+  if (!upperQuery.trim().startsWith('SELECT')) {
+    return res.status(400).json({ error: 'Дозволені лише SELECT запити' });
+  }
+
+  db.all(query, (err, rows) => {
+    if (err) {
+      console.error('SQL error:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(rows);
+  });
+});
+
 app.listen(3000, () => console.log('Server running on port 3000'));
