@@ -169,14 +169,14 @@ app.post('/api/admin/sql', (req, res) => {
   // Забороняємо небезпечні операції
   const forbidden = ['DROP', 'DELETE FROM', 'UPDATE', 'INSERT', 'ALTER', 'CREATE', 'PRAGMA'];
   const upperQuery = query.toUpperCase();
-  if (forbidden.some(cmd => upperQuery.includes(cmd))) {
+  /*if (forbidden.some(cmd => upperQuery.includes(cmd))) {
     return res.status(400).json({ error: 'Операція заборонена в цьому інтерфейсі' });
   }
 
   // Дозволяємо тільки SELECT
   if (!upperQuery.trim().startsWith('SELECT')) {
     return res.status(400).json({ error: 'Дозволені лише SELECT запити' });
-  }
+  }*/
 
   db.all(query, (err, rows) => {
     if (err) {
