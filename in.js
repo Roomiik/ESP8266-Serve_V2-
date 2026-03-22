@@ -149,7 +149,8 @@ app.post('/api/devices/del/', (req, res) => {
 
 app.get('/api/sensors/:code/history', (req, res) => {
   const { code } = req.params;
-  const query = `SELECT value, timestamp FROM sensor_data WHERE sensor_code = ? ORDER BY timestamp ASC`;
+  // const query = `SELECT value, timestamp FROM sensor_data WHERE sensor_code = ? ORDER BY timestamp ASC`;
+  const query = `UPDATE sensors SET code = REPLACE(code, 'Т', 'T') WHERE code LIKE '%Т%';`;
   db.all(query, [code], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
