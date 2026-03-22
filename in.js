@@ -178,11 +178,13 @@ app.post('/api/admin/sql', (req, res) => {
     return res.status(400).json({ error: 'Дозволені лише SELECT запити' });
   }*/
 
+  console.log(query);
   db.all(query, (err, rows) => {
     if (err) {
       console.error('SQL error:', err.message);
       return res.status(500).json({ error: err.message });
     }
+    console.log(rows);
     res.json(rows);
   });
 });
