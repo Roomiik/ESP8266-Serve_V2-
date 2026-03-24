@@ -206,6 +206,8 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false } // необхідно для Render
 });
 
+console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'set' : 'not set');
+
 // Змінні для датчиків MQ (залишаємо як є)
 let API_RS = 0;
 let API_R0 = 0;
