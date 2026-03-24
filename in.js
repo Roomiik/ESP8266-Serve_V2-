@@ -213,7 +213,7 @@ let API_RS = 0;
 let API_R0 = 0;
 
 // Функція створення таблиць (якщо вони не існують)
-async function createTables() {
+/*async function createTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS sensors (
       id SERIAL PRIMARY KEY,
@@ -242,7 +242,7 @@ async function createTables() {
   `);
   console.log('Tables created/verified');
 }
-createTables().catch(console.error);
+createTables().catch(console.error);*/
 
 // ========== API маршрути ==========
 
