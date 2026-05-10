@@ -192,7 +192,6 @@
 // app.listen(3000, () => console.log('Server running on port 3000'));
 
 const express = require('express');
-const { Pool } = require('pg');
 const cors = require('cors');
 
 const app = express();
@@ -200,68 +199,46 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Підключення до PostgreSQL через змінну середовища DATABASE_URL
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false } // необхідно для Render
-});
+// ========== Сховище в пам'яті ==========
 
-console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'set' : 'not set');
+// Датчики: { [code]: { id, code, name, type, subtype, unit } }
+const sensors = {};
 
-// Змінні для датчиків MQ (залишаємо як є)
+// Насоси: { [code]: { id, code, name, status } }
+const pumps = {};
+
+// Дані датчиків: { [sensor_code]: [ { id, sensor_code, value, timestamp } ] }
+const sensorData = {};
+
+// Лічильник ID
+let nextId = 1;
+const newId = () => nextId++;
+
+// Змінні для датчиків MQ
 let API_RS = 0;
 let API_R0 = 0;
-
-// Функція створення таблиць (якщо вони не існують)
-/*async function createTables() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS sensors (
-      id SERIAL PRIMARY KEY,
-      code TEXT UNIQUE NOT NULL,
-      name TEXT NOT NULL,
-      type TEXT NOT NULL,
-      subtype TEXT,
-      unit TEXT
-    )
-  `);
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS sensor_data (
-      id SERIAL PRIMARY KEY,
-      sensor_code TEXT REFERENCES sensors(code) ON DELETE CASCADE,
-      value REAL NOT NULL,
-      timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS pumps (
-      id SERIAL PRIMARY KEY,
-      code TEXT UNIQUE NOT NULL,
-      name TEXT NOT NULL,
-      status TEXT DEFAULT 'off'
-    )
-  `);
-  console.log('Tables created/verified');
-}
-createTables().catch(console.error);*/
 
 // ========== API маршрути ==========
 
 // Додавання нового пристрою (з фронтенду)
-app.post('/api/devices', async (req, res) => {
+app.post('/api/devices', (req, res) => {
   const { code, name, type, subtype, unit } = req.body;
   try {
     if (type === 'sensor') {
-      const result = await pool.query(
-        'INSERT INTO sensors (code, name, type, subtype, unit) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-        [code, name, type, subtype, unit]
-      );
-      res.json({ id: result.rows[0].id });
+      if (sensors[code]) {
+        return res.status(400).json({ error: 'Sensor with this code already exists' });
+      }
+      const id = newId();
+      sensors[code] = { id, code, name, type, subtype, unit };
+      sensorData[code] = [];
+      res.json({ id });
     } else if (type === 'pump') {
-      const result = await pool.query(
-        'INSERT INTO pumps (code, name, status) VALUES ($1, $2, $3) RETURNING id',
-        [code, name, 'off']
-      );
-      res.json({ id: result.rows[0].id });
+      if (pumps[code]) {
+        return res.status(400).json({ error: 'Pump with this code already exists' });
+      }
+      const id = newId();
+      pumps[code] = { id, code, name, status: 'off' };
+      res.json({ id });
     } else {
       res.status(400).json({ error: 'Invalid device type' });
     }
@@ -272,12 +249,11 @@ app.post('/api/devices', async (req, res) => {
 });
 
 // Отримання всіх пристроїв
-app.get('/api/devices', async (req, res) => {
+app.get('/api/devices', (req, res) => {
   try {
-    const sensors = await pool.query('SELECT * FROM sensors');
-    const pumps = await pool.query('SELECT * FROM pumps');
-    const pumpsWithType = pumps.rows.map(p => ({ ...p, type: 'pump' }));
-    res.json([...sensors.rows, ...pumpsWithType]);
+    const allSensors = Object.values(sensors);
+    const allPumps = Object.values(pumps).map(p => ({ ...p, type: 'pump' }));
+    res.json([...allSensors, ...allPumps]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -285,39 +261,51 @@ app.get('/api/devices', async (req, res) => {
 });
 
 // Отримання останніх даних для всіх датчиків
-app.get('/api/sensors/latest', async (req, res) => {
+app.get('/api/sensors/latest', (req, res) => {
   try {
-    // Використовуємо той самий запит, що був у SQLite, адаптований до PostgreSQL
-    const query = `
-      SELECT s.*
-      FROM sensor_data s
-      JOIN (
-          SELECT sensor_code, MAX(id) AS last_id
-          FROM sensor_data
-          GROUP BY sensor_code
-      ) AS last_records
-      ON s.id = last_records.last_id
-    `;
-    const result = await pool.query(query);
-    res.json(result.rows);
+    const latest = Object.entries(sensorData)
+      .map(([code, records]) => {
+        if (records.length === 0) return null;
+        return records[records.length - 1]; // останній запис
+      })
+      .filter(Boolean);
+    res.json(latest);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
 
+// Максимальна кількість записів на датчик
+const MAX_RECORDS_PER_SENSOR = 5000;
+
 // Прийом даних від ESP8266
-app.post('/api/sensors/data', async (req, res) => {
+app.post('/api/sensors/data', (req, res) => {
   const data = req.body;
   try {
     for (const key of Object.keys(data)) {
       const { code, value } = data[key];
       if (code && value !== undefined) {
-        await pool.query(
-          'INSERT INTO sensor_data (sensor_code, value) VALUES ($1, $2)',
-          [code, value]
-        );
-        console.log(`Inserted: ${code} = ${value}`);
+        if (!sensorData[code]) {
+          sensorData[code] = [];
+        }
+
+        const record = {
+          id: newId(),
+          sensor_code: code,
+          value,
+          timestamp: new Date().toISOString()
+        };
+        sensorData[code].push(record);
+
+        // Якщо записів більше ніж MAX_RECORDS_PER_SENSOR — видаляємо найстаріші
+        if (sensorData[code].length > MAX_RECORDS_PER_SENSOR) {
+          const excess = sensorData[code].length - MAX_RECORDS_PER_SENSOR;
+          sensorData[code].splice(0, excess);
+          console.log(`[${code}] Trimmed ${excess} old record(s), keeping last ${MAX_RECORDS_PER_SENSOR}`);
+        }
+
+        console.log(`Inserted: ${code} = ${value} (total: ${sensorData[code].length})`);
       }
     }
     res.json({ received: true });
@@ -327,6 +315,7 @@ app.post('/api/sensors/data', async (req, res) => {
   }
 });
 
+// MQ датчик — зберегти RS/R0
 app.post('/api/sensors/mq', (req, res) => {
   const { rs, r0 } = req.body;
   console.log("Rs:", rs);
@@ -336,36 +325,36 @@ app.post('/api/sensors/mq', (req, res) => {
   res.json({ RS: rs, R0: r0 });
 });
 
+// MQ датчик — отримати RS/R0
 app.get('/api/sensors/mq/api', (req, res) => {
   console.log({ RS: API_RS, R0: API_R0 });
   res.json({ RS: API_RS, R0: API_R0 });
 });
 
 // Керування насосом (зміна статусу)
-app.post('/api/pumps/:code/toggle', async (req, res) => {
+app.post('/api/pumps/:code/toggle', (req, res) => {
   const { code } = req.params;
   try {
-    const pump = await pool.query('SELECT status FROM pumps WHERE code = $1', [code]);
-    if (pump.rows.length === 0) {
+    if (!pumps[code]) {
       return res.status(404).json({ error: 'Pump not found' });
     }
-    const newStatus = pump.rows[0].status === 'on' ? 'off' : 'on';
-    await pool.query('UPDATE pumps SET status = $1 WHERE code = $2', [newStatus, code]);
-    res.json({ code, status: newStatus });
+    pumps[code].status = pumps[code].status === 'on' ? 'off' : 'on';
+    res.json({ code, status: pumps[code].status });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Видалення датчика (виправлено)
-app.post('/api/devices/del/', async (req, res) => {
+// Видалення датчика
+app.post('/api/devices/del/', (req, res) => {
   const { code } = req.body;
   try {
-    const result = await pool.query('DELETE FROM sensors WHERE code = $1 RETURNING id', [code]);
-    if (result.rowCount === 0) {
+    if (!sensors[code]) {
       return res.status(404).json({ error: 'Sensor not found' });
     }
+    delete sensors[code];
+    delete sensorData[code];
     res.json({ status: 'ok' });
   } catch (err) {
     console.error(err);
@@ -374,14 +363,16 @@ app.post('/api/devices/del/', async (req, res) => {
 });
 
 // Історія датчика
-app.get('/api/sensors/:code/history', async (req, res) => {
+app.get('/api/sensors/:code/history', (req, res) => {
   const { code } = req.params;
   try {
-    const result = await pool.query(
-      'SELECT value, timestamp FROM sensor_data WHERE sensor_code = $1 ORDER BY timestamp ASC',
-      [code]
-    );
-    res.json(result.rows);
+    const history = sensorData[code];
+    if (!history) {
+      return res.status(404).json({ error: 'Sensor not found' });
+    }
+    // Повертаємо відсортовано за часом (вже в порядку вставки, але на всяк)
+    const sorted = [...history].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    res.json(sorted.map(r => ({ value: r.value, timestamp: r.timestamp })));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -391,3 +382,4 @@ app.get('/api/sensors/:code/history', async (req, res) => {
 // Запуск сервера
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
