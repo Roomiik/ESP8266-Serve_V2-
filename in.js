@@ -297,6 +297,7 @@ app.post('/api/sensors/data', (req, res) => {
           timestamp: new Date().toISOString()
         };
         sensorData[code].push(record);
+        console.log(record);
 
         // Якщо записів більше ніж MAX_RECORDS_PER_SENSOR — видаляємо найстаріші
         if (sensorData[code].length > MAX_RECORDS_PER_SENSOR) {
