@@ -282,6 +282,7 @@ const MAX_RECORDS_PER_SENSOR = 5000;
 // Прийом даних від ESP8266
 app.post('/api/sensors/data', (req, res) => {
   const data = req.body;
+  console.log(123321);
   try {
     for (const key of Object.keys(data)) {
       const { code, value } = data[key];
