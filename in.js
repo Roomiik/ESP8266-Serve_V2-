@@ -277,7 +277,7 @@ app.get('/api/sensors/latest', (req, res) => {
 });
 
 // Максимальна кількість записів на датчик
-const MAX_RECORDS_PER_SENSOR = 5000;
+const MAX_RECORDS_PER_SENSOR = 500;
 setInterval(() => {console.log(`sensorData: ${sensorData}`)}, 5000);
 // Прийом даних від ESP8266
 app.post('/api/sensors/data', (req, res) => {
