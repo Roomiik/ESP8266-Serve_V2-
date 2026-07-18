@@ -375,7 +375,7 @@ app.get('/api/sensors/:code/history', (req, res) => {
     // Повертаємо відсортовано за часом (вже в порядку вставки, але на всяк)
     const sorted = [...history].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     const last50 = sorted.slice(-50);
-    res.json(limited.map(r => ({ value: r.value, timestamp: r.timestamp })));
+    res.json(last50.map(r => ({ value: r.value, timestamp: r.timestamp })));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
