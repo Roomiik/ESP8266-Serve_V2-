@@ -207,6 +207,8 @@ const sensors = {};
 // Насоси: { [code]: { id, code, name, status } }
 const pumps = {};
 
+const plants = {};
+
 // Дані датчиків: { [sensor_code]: [ { id, sensor_code, value, timestamp } ] }
 const sensorData = {};
 
@@ -235,6 +237,10 @@ app.post('/api/devices', (req, res) => {
     } else if (type === 'pump') {
       if (pumps[code]) {
         return res.status(400).json({ error: 'Pump with this code already exists' });
+      }
+    } else if (type === 'plant') {
+      if (pumps[code]) {
+        return res.status(400).json({ error: 'Plant with this code already exists' });
       }
       const id = newId();
       pumps[code] = { id, code, name, status: 'off' };
