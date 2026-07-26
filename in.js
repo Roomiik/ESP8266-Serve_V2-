@@ -259,8 +259,9 @@ app.post('/api/devices', (req, res) => {
 app.get('/api/devices', (req, res) => {
   try {
     const allSensors = Object.values(sensors);
+    const allPlants = Object.values(plants);
     const allPumps = Object.values(pumps).map(p => ({ ...p, type: 'pump' }));
-    res.json([...allSensors, ...allPumps]);
+    res.json([...allSensors, ...allPumps, ...allPlants]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
