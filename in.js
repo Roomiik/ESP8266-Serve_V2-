@@ -239,11 +239,11 @@ app.post('/api/devices', (req, res) => {
         return res.status(400).json({ error: 'Pump with this code already exists' });
       }
     } else if (type === 'plant') {
-      if (pumps[code]) {
+      if (plants[code]) {
         return res.status(400).json({ error: 'Plant with this code already exists' });
       }
       const id = newId();
-      pumps[code] = { id, code, name, humidity: 'off' };
+      plants[code] = { id, code, name, humidity: 0 };
       res.json({ id });
     } else {
       res.status(400).json({ error: 'Invalid device type' });
