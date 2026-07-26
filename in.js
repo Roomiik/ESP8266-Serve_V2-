@@ -244,7 +244,7 @@ app.post('/api/devices', (req, res) => {
         return res.status(400).json({ error: 'Plant with this code already exists' });
       }
       const id = newId();
-      plants[code] = { id, code, name, humidity: 0 };
+      plants[code] = { id, code, name, type, humidity: 0 };
       res.json({ id });
     } else {
       res.status(400).json({ error: 'Invalid device type' });
