@@ -238,7 +238,8 @@ app.post('/api/devices', (req, res) => {
       if (pumps[code]) {
         return res.status(400).json({ error: 'Pump with this code already exists' });
       }
-    } else if (type === 'plant') {
+    } 
+    else if (type === 'plant') {
       if (plants[code]) {
         return res.status(400).json({ error: 'Plant with this code already exists' });
       }
