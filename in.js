@@ -356,6 +356,41 @@ app.post('/api/pumps/:code/toggle', (req, res) => {
   }
 });
 
+app.post('/api/history/from/:from/to/:to', (req, res) => {
+  const { from, to } = req.params;
+  try {
+    const history = filterByTimestampsensorData(sensorData);
+    if (!history) {
+      return res.status(404).json({ error: 'Sensor not found' });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+function filterByTimestamp(readings, from = null, to = null) {
+  if (!readings?.length) return null
+
+  // Знаходимо межі з масиву якщо не передані
+  const timestamps = readings.map(r => new Date(r.timestamp).getTime())
+  const fromMs = from ? new Date(from).getTime() : Math.min(...timestamps)
+  const toMs   = to   ? new Date(to).getTime()   : Math.max(...timestamps)
+
+  const sorted = readings
+    .filter(r => {
+      const t = new Date(r.timestamp).getTime()
+      return t >= fromMs && t <= toMs
+    })
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+
+  return {
+    sorted,
+    from: new Date(fromMs).toISOString(),
+    to:   new Date(toMs).toISOString(),
+  }
+}
+
 // Видалення датчика
 app.post('/api/devices/del/', (req, res) => {
   const { code } = req.body;
@@ -382,7 +417,7 @@ app.get('/api/sensors/:code/history', (req, res) => {
     }
     // Повертаємо відсортовано за часом (вже в порядку вставки, але на всяк)
     const sorted = [...history].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-    const last50 = sorted.slice(-50);
+    const last50 = sorted.slice(-100);
     res.json(last50.map(r => ({ value: r.value, timestamp: r.timestamp })));
   } catch (err) {
     console.error(err);
