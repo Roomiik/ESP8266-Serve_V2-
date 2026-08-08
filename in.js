@@ -337,6 +337,10 @@ app.post('/api/sensors/mq', (req, res) => {
 
 // MQ датчик — отримати RS/R0
 app.get('/api/sensors/mq/api', (req, res) => {
+  res.json({ sensorData });
+});
+
+app.get('/api/sensors/history', (req, res) => {
   console.log({ RS: API_RS, R0: API_R0 });
   res.json({ RS: API_RS, R0: API_R0 });
 });
