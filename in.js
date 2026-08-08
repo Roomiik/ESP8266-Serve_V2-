@@ -356,8 +356,8 @@ app.post('/api/pumps/:code/toggle', (req, res) => {
   }
 });
 
-app.post('/api/history/from/:from/to/:to', (req, res) => {
-  const { from, to } = req.params;
+app.post('/api/history', (req, res) => {
+  const { from, to } = req.body;
   try {
     const history = filterByTimestampsensorData(sensorData);
     if (!history) {
