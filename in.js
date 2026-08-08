@@ -359,7 +359,7 @@ app.post('/api/pumps/:code/toggle', (req, res) => {
 app.post('/api/history', (req, res) => {
   const { from, to } = req.body;
   try {
-    const history = filterByTimestampsensorData(sensorData);
+    const history = filterByTimestamp(sensorData, from, to);
     if (!history) {
       return res.status(404).json({ error: 'Sensor not found' });
     }
